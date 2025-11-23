@@ -1,5 +1,6 @@
 """
 Execution Manager - Secure tool execution
+
 Module: resources.execution_manager
 Date: 2025-11-23
 Version: 0.2.0-alpha
@@ -10,6 +11,7 @@ CHANGELOG:
   - Parameter validation against JSON Schema
   - Permission verification before execution
   - Timeout and resource limits
+  - Per-client sandboxing
   - Audit logging of all executions
   - Error handling and reporting
 
@@ -17,14 +19,14 @@ ARCHITECTURE:
 ExecutionManager orchestrates secure tool execution:
   1. Validate input parameters against schema
   2. Check permissions with PermissionManager
-  3. Execute in sandbox with timeout
+  3. Create/reuse sandbox with timeout
   4. Capture and log results/errors
   5. Return formatted response
 
 ExecutionManager is owned by MCPServer and uses:
   - ToolManager (get tools)
   - PermissionManager (check permissions)
-  - SandboxContext (isolated execution)
+  - SandboxContext (isolated execution per client)
 
 SECURITY NOTES:
 - All parameters validated before execution
@@ -45,6 +47,7 @@ import time
 from ..tools.tool import Tool
 from ..security.permission_manager import PermissionManager, PermissionDeniedError
 from ..security.client_context import ClientContext
+from .sandbox_context import SandboxContext
 
 
 class ExecutionError(Exception):
@@ -66,12 +69,19 @@ class ValidationError(Exception):
         super().__init__(message)
 
 
+class ExecutionTimeout(ExecutionError):
+    """Raised when tool execution times out"""
+
+    def __init__(self, message: str):
+        super().__init__(message, error_type="timeout")
+
+
 class ExecutionManager:
     """
     Manages secure execution of tools
 
     Coordinates validation, permission checking, and safe execution
-    of tools with timeout and resource limits.
+    of tools with timeout, resource limits, and per-client sandboxing.
     """
 
     def __init__(
@@ -93,8 +103,39 @@ class ExecutionManager:
         self.default_timeout = default_timeout
         self.max_memory_mb = max_memory_mb
 
+        # Execution contexts per client
+        self._sandboxes: Dict[str, SandboxContext] = {}
+
         # Execution audit trail
         self._execution_log: list = []
+
+    def get_sandbox(self, client_id: str) -> SandboxContext:
+        """
+        Get or create sandbox for client
+
+        Args:
+            client_id: Client identifier
+
+        Returns:
+            SandboxContext: Client's sandbox
+        """
+        if client_id not in self._sandboxes:
+            self._sandboxes[client_id] = SandboxContext(client_id)
+            self.logger.debug(f"Sandbox created for {client_id}")
+
+        return self._sandboxes[client_id]
+
+    def clear_sandbox(self, client_id: str) -> None:
+        """
+        Clear sandbox for a client
+
+        Args:
+            client_id: Client identifier
+        """
+        if client_id in self._sandboxes:
+            self._sandboxes[client_id].clear()
+            del self._sandboxes[client_id]
+            self.logger.info(f"Sandbox cleared for {client_id}")
 
     async def execute_tool(
         self,
@@ -108,9 +149,9 @@ class ExecutionManager:
         Full execution flow:
         1. Validate parameters against schema
         2. Check permissions
-        3. Execute in sandbox with timeout
-        4. Log execution
-        5. Return result or error
+        3. Get sandbox context
+        4. Execute with timeout
+        5. Log execution and return result
 
         Args:
             tool: Tool to execute
@@ -143,11 +184,15 @@ class ExecutionManager:
             # Step 2: Check permissions
             self._check_permissions(client, tool)
 
-            # Step 3: Execute with timeout
+            # Step 3: Get sandbox context
+            sandbox = self.get_sandbox(client.client_id)
+            sandbox.increment_execution_count()
+
+            # Step 4: Execute with timeout
             timeout = tool.timeout if hasattr(tool, "timeout") else self.default_timeout
             result = await self._execute_with_timeout(tool, client, params, timeout)
 
-            # Step 4: Log success
+            # Step 5: Log success
             execution_time = time.time() - start_time
             self._log_execution(
                 execution_id=execution_id,
@@ -201,7 +246,7 @@ class ExecutionManager:
             )
             raise
 
-        except asyncio.TimeoutError:
+        except ExecutionTimeout as e:
             self.logger.error(f"Tool execution timeout: {tool.name}")
             self._log_execution(
                 execution_id=execution_id,
@@ -210,12 +255,9 @@ class ExecutionManager:
                 status="timeout",
                 execution_time=time.time() - start_time,
                 params=params,
-                error="Execution timeout",
+                error=str(e),
             )
-            raise ExecutionError(
-                f"Tool execution timeout after {timeout}s",
-                error_type="timeout",
-            )
+            raise
 
         except Exception as e:
             self.logger.error(f"Tool execution failed: {e}")
@@ -349,7 +391,7 @@ class ExecutionManager:
             Any: Tool execution result
 
         Raises:
-            asyncio.TimeoutError: If execution exceeds timeout
+            ExecutionTimeout: If execution exceeds timeout
         """
         # Execute with timeout
         try:
@@ -362,7 +404,9 @@ class ExecutionManager:
             self.logger.error(
                 f"Tool {tool.name} exceeded timeout of {timeout}s"
             )
-            raise
+            raise ExecutionTimeout(
+                f"Tool execution timeout after {timeout}s"
+            )
 
     def _log_execution(
         self,
@@ -452,8 +496,8 @@ class ExecutionManager:
 if __name__ == "__main__":
     import unittest
     from unittest.mock import AsyncMock, MagicMock
-    from ..tools.tool import FunctionTool
-    from ..security.permission import Permission, PermissionType
+    from ..tools.tool import FunctionTool, InputSchema, OutputSchema
+    from ..security.permission import Permission, PermissionType, DEFAULT_PERMISSIONS
 
     class TestExecutionManager(unittest.TestCase):
         """Test suite for ExecutionManager"""
@@ -469,6 +513,24 @@ if __name__ == "__main__":
             self.assertEqual(self.manager.default_timeout, 30)
             self.assertEqual(self.manager.max_memory_mb, 512)
             self.assertEqual(len(self.manager.get_execution_log()), 0)
+
+        def test_get_sandbox_creation(self):
+            """Test sandbox creation"""
+            sandbox = self.manager.get_sandbox("client1")
+            self.assertIsNotNone(sandbox)
+            self.assertEqual(sandbox.client_id, "client1")
+
+        def test_get_sandbox_reuse(self):
+            """Test sandbox reuse"""
+            sandbox1 = self.manager.get_sandbox("client1")
+            sandbox2 = self.manager.get_sandbox("client1")
+            self.assertIs(sandbox1, sandbox2)
+
+        def test_clear_sandbox(self):
+            """Test sandbox cleanup"""
+            self.manager.get_sandbox("client1")
+            self.manager.clear_sandbox("client1")
+            self.assertNotIn("client1", self.manager._sandboxes)
 
         def test_validate_params_success(self):
             """Test parameter validation success"""
@@ -588,6 +650,58 @@ if __name__ == "__main__":
                 )
                 self.assertIn("content", result)
                 self.assertFalse(result["isError"])
+
+            asyncio.run(run_test())
+
+        def test_execute_tool_permission_denied(self):
+            """Test tool execution with permission denied"""
+
+            async def run_test():
+                async def my_tool(ctx, params):
+                    return {}
+
+                tool = FunctionTool(
+                    name="test",
+                    description="Test tool",
+                    func=my_tool,
+                    permissions=[Permission(PermissionType.FILE_WRITE, "/tmp/*")],
+                )
+
+                self.permission_manager.initialize_client(
+                    self.client.client_id, []
+                )
+
+                with self.assertRaises(PermissionDeniedError):
+                    await self.manager.execute_tool(
+                        tool, self.client, {}
+                    )
+
+            asyncio.run(run_test())
+
+        def test_execute_tool_timeout(self):
+            """Test tool execution timeout"""
+
+            async def run_test():
+                async def slow_tool(ctx, params):
+                    await asyncio.sleep(5)
+                    return {}
+
+                tool = FunctionTool(
+                    name="slow",
+                    description="Slow tool",
+                    func=slow_tool,
+                    timeout=1,
+                    permissions=[],
+                )
+
+                self.permission_manager.initialize_client(
+                    self.client.client_id, []
+                )
+
+                with self.assertRaises(ExecutionTimeout):
+                    await self.manager.execute_tool(
+                        tool, self.client, {}
+                    )
 
             asyncio.run(run_test())
 

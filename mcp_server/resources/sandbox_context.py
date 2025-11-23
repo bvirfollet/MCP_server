@@ -12,11 +12,12 @@ CHANGELOG:
   - Working directory management
   - Context cleanup
   - State isolation between clients
+  - Execution count tracking
 
 ARCHITECTURE:
 SandboxContext provides isolated execution environment for each client:
   - Separate variable storage
-  - Isolated working directory (Phase 6)
+  - Isolated working directory
   - State persistence across tool calls
   - Cleanup on client disconnect
 
@@ -27,13 +28,15 @@ SECURITY NOTES:
 - Complete isolation between clients
 - No shared state between contexts
 - Variables scoped to client only
-- Working directory restricted (Phase 6)
+- Working directory restricted
 - Cleanup on context destroy
 """
 
 import logging
 from typing import Any, Dict, Optional
 from datetime import datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 class SandboxContext:
@@ -53,17 +56,28 @@ class SandboxContext:
 
         Args:
             client_id: Client identifier
-            working_dir: Working directory for this context (Phase 6)
+            working_dir: Working directory for this context (optional)
         """
         self.logger = logging.getLogger(f"sandbox.{client_id}")
         self.client_id = client_id
-        self.working_dir = working_dir or f"/tmp/mcp_sandbox_{client_id}"
 
         # Execution environment
         self._variables: Dict[str, Any] = {}
         self._execution_count = 0
         self._created_at = datetime.utcnow()
         self._last_activity = datetime.utcnow()
+
+        # Create temp directory for client
+        try:
+            if working_dir:
+                self.working_dir = working_dir
+            else:
+                self._temp_dir = TemporaryDirectory(prefix=f"sandbox_{client_id}_")
+                self.working_dir = self._temp_dir.name
+        except Exception as e:
+            self.logger.error(f"Failed to create working directory: {e}")
+            self._temp_dir = None
+            self.working_dir = f"/tmp/mcp_sandbox_{client_id}"
 
         self.logger.info(f"Sandbox context created for {client_id}")
 
@@ -190,6 +204,12 @@ class SandboxContext:
         )
         self._variables.clear()
         self._execution_count = 0
+
+        if hasattr(self, "_temp_dir") and self._temp_dir:
+            try:
+                self._temp_dir.cleanup()
+            except Exception as e:
+                self.logger.error(f"Error cleaning temp directory: {e}")
 
     def __repr__(self) -> str:
         """String representation"""
