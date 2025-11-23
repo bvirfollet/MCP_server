@@ -42,9 +42,10 @@ SECURITY NOTES:
 
 import asyncio
 import logging
+import os
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from .constants import (
     SERVER_NAME,
@@ -62,6 +63,19 @@ from ..tools.tool_manager import ToolManager
 from ..security.permission_manager import PermissionManager
 from ..resources.execution_manager import ExecutionManager
 from ..resources.sandbox_context import SandboxContext
+
+# Phase 3: Authentication & Persistence
+from ..security.authentication import (
+    JWTHandler,
+    JWTError,
+    JWTExpiredError,
+    ClientManager,
+    ClientError,
+)
+from ..persistence import (
+    TokenManager,
+    AuditLogger,
+)
 
 
 @dataclass
@@ -96,13 +110,21 @@ class MCPServer:
         await server.start()
     """
 
-    def __init__(self, server_name: str = SERVER_NAME, server_version: str = SERVER_VERSION):
+    def __init__(
+        self,
+        server_name: str = SERVER_NAME,
+        server_version: str = SERVER_VERSION,
+        data_dir: str = "./data",
+        jwt_secret_key: Optional[str] = None,
+    ):
         """
         Initialize MCP Server
 
         Args:
             server_name: Name for this server instance
             server_version: Version string
+            data_dir: Directory for persistent data (Phase 3)
+            jwt_secret_key: Secret key for JWT signing (defaults to env var or generated)
         """
         self.logger = logging.getLogger("core.mcp_server")
 
@@ -128,6 +150,27 @@ class MCPServer:
         # Sandbox contexts per client
         self._sandbox_contexts: Dict[str, SandboxContext] = {}
 
+        # Phase 3: Authentication & Persistence
+        self.data_dir = data_dir
+
+        # JWT Handler
+        jwt_secret = jwt_secret_key or os.getenv(
+            "JWT_SECRET_KEY",
+            "changeme-32-chars-minimum-for-development-only!!!!"
+        )
+        self.jwt_handler = JWTHandler(
+            secret_key=jwt_secret,
+            access_token_expire_minutes=60,
+            refresh_token_expire_days=7,
+        )
+
+        # Token & Client Management
+        self.token_manager = TokenManager(data_dir)
+        self.client_manager = ClientManager(data_dir)
+
+        # Audit Logger
+        self.audit_logger = AuditLogger(data_dir)
+
         # Server state
         self._is_running = False
         self._startup_time: Optional[datetime] = None
@@ -141,7 +184,14 @@ class MCPServer:
         self.register_method("tools/list", self._handle_tools_list)
         self.register_method("tools/call", self._handle_tools_call)
 
+        # Register Phase 3 method handlers
+        self.register_method("auth/token", self._handle_auth_token)
+        self.register_method("auth/refresh", self._handle_auth_refresh)
+        self.register_method("auth/revoke", self._handle_auth_revoke)
+
         self.logger.info(f"Server initialized: {server_name} v{server_version}")
+        self.logger.info(f"Data directory: {data_dir}")
+        self.logger.info("Phase 3 (Authentication) initialized")
 
     @property
     def is_running(self) -> bool:
@@ -449,6 +499,171 @@ class MCPServer:
         )
 
         return result
+
+    # ========================================================================
+    # Phase 3: Authentication Handlers
+    # ========================================================================
+
+    async def _handle_auth_token(
+        self,
+        client: ClientContext,
+        params: dict
+    ) -> dict:
+        """
+        Handle auth/token request - Authenticate client
+
+        Args:
+            client: Client context
+            params: {"username": "...", "password": "..."}
+
+        Returns:
+            dict: {"access_token": "...", "refresh_token": "...", "expires_in": 3600}
+
+        Raises:
+            ValueError: If authentication fails
+        """
+        username = params.get("username")
+        password = params.get("password")
+
+        if not username or not password:
+            raise ValueError("username and password required")
+
+        try:
+            # Authenticate client
+            client_record = self.client_manager.authenticate(username, password)
+
+            # Generate tokens
+            token_pair = self.jwt_handler.generate_tokens(
+                client_id=client_record.client_id,
+                username=client_record.username,
+                roles=client_record.roles,
+            )
+
+            # Store tokens
+            self.token_manager.create_token(
+                jti=token_pair.access_token.split(".")[-2][:8],  # Use part of JWT as JTI
+                client_id=client_record.client_id,
+                username=client_record.username,
+                access_token=token_pair.access_token,
+                refresh_token=token_pair.refresh_token,
+                access_expires_at=token_pair.access_expires_at,
+                refresh_expires_at=token_pair.refresh_expires_at,
+            )
+
+            # Log authentication
+            self.audit_logger.log_auth_success(
+                client_id=client_record.client_id,
+                username=client_record.username,
+            )
+
+            # Enrich client context
+            client.authenticated = True
+            client.user_id = client_record.client_id
+            client.username = client_record.username
+            client.roles = client_record.roles
+            client.auth_time = datetime.now(timezone.utc)
+
+            return {
+                "access_token": token_pair.access_token,
+                "refresh_token": token_pair.refresh_token,
+                "expires_in": 3600,
+                "token_type": "Bearer",
+            }
+
+        except ClientError as e:
+            # Log failed authentication
+            self.audit_logger.log_auth_failed(
+                username=username,
+                reason=str(e),
+            )
+            raise ValueError(f"Authentication failed: {e}")
+
+    async def _handle_auth_refresh(
+        self,
+        client: ClientContext,
+        params: dict
+    ) -> dict:
+        """
+        Handle auth/refresh request - Refresh access token
+
+        Args:
+            client: Client context
+            params: {"refresh_token": "..."}
+
+        Returns:
+            dict: {"access_token": "...", "expires_in": 3600}
+
+        Raises:
+            ValueError: If refresh fails
+        """
+        refresh_token = params.get("refresh_token")
+
+        if not refresh_token:
+            raise ValueError("refresh_token required")
+
+        try:
+            # Validate refresh token and get new access token
+            access_token = self.jwt_handler.refresh_access_token(refresh_token)
+
+            # Log token refresh
+            self.audit_logger.log_event(
+                event_type="auth_token_refresh",
+                client_id=client.user_id,
+                username=client.username,
+                status="success",
+                message="Access token refreshed",
+            )
+
+            return {
+                "access_token": access_token,
+                "expires_in": 3600,
+                "token_type": "Bearer",
+            }
+
+        except (JWTError, JWTExpiredError) as e:
+            raise ValueError(f"Token refresh failed: {e}")
+
+    async def _handle_auth_revoke(
+        self,
+        client: ClientContext,
+        params: dict
+    ) -> dict:
+        """
+        Handle auth/revoke request - Revoke a token
+
+        Args:
+            client: Client context
+            params: {"jti": "..."}
+
+        Returns:
+            dict: {"status": "revoked"}
+
+        Raises:
+            ValueError: If revocation fails
+        """
+        jti = params.get("jti")
+
+        if not jti:
+            raise ValueError("jti required")
+
+        try:
+            # Revoke token
+            self.token_manager.revoke_token(jti)
+
+            # Log token revocation
+            self.audit_logger.log_event(
+                event_type="auth_token_revoked",
+                client_id=client.user_id,
+                username=client.username,
+                status="success",
+                message=f"Token revoked: {jti}",
+                details={"jti": jti},
+            )
+
+            return {"status": "revoked"}
+
+        except Exception as e:
+            raise ValueError(f"Token revocation failed: {e}")
 
 
 # ============================================================================

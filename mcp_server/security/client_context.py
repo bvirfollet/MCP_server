@@ -31,8 +31,8 @@ SECURITY NOTES:
 import uuid
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional, Dict, Any
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 
 
 @dataclass
@@ -97,6 +97,14 @@ class ClientContext:
         self._authenticated = False
         self._auth_token: Optional[str] = None
 
+        # Phase 3: Authentication fields (JWT)
+        self.authenticated: bool = False
+        self.user_id: Optional[str] = None
+        self.username: Optional[str] = None
+        self.roles: List[str] = []
+        self.auth_time: Optional[datetime] = None
+        self.token_jti: Optional[str] = None
+
     @property
     def client_id(self) -> str:
         """Get unique client ID"""
@@ -134,8 +142,13 @@ class ClientContext:
             "created_at": self.metadata.created_at.isoformat(),
             "last_activity": self.metadata.last_activity.isoformat(),
             "request_count": self.request_count,
-            "authenticated": self.is_authenticated,
+            "authenticated": self.is_authenticated or self.authenticated,
             "info": self.metadata.client_info,
+            # Phase 3: Authentication info
+            "user_id": self.user_id,
+            "username": self.username,
+            "roles": self.roles,
+            "auth_time": self.auth_time.isoformat() if self.auth_time else None,
         }
 
     def __repr__(self) -> str:
