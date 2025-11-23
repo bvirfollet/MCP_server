@@ -172,7 +172,7 @@ mcp_server/
 | **3.1** | mTLS optionnel et rotation de clés | ⏳ À venir |
 | **4** | Transport TCP/HTTP+WebSocket (multi-transport parallèle) | ✅ Complet (9 tests) |
 | **5** | Transport DBus | ⏳ À venir |
-| **6** | Isolation par processus (subprocess) | ⏳ À venir |
+| **6** | Isolation par processus (subprocess) | ✅ Complet (51 tests) |
 | **7** | Audit et monitoring avancé | ⏳ À venir |
 
 ### 📊 Statistiques de Validation
@@ -189,7 +189,7 @@ mcp_server/
 - Per-client sandbox contexts avec persistance variables
 - Exécution sécurisée avec timeouts et validation
 
-**Phase 3 🔄 En cours**
+**Phase 3 ✅**
 - 8 modules : JSONStore, TokenManager, JWTHandler, ClientManager, AuditLogger, MCPServer (Phase 3), ClientContext (Phase 3), + test runner
 - 64+ tests unitaires (JSONStore 8 + TokenManager 12 + JWTHandler 12 + ClientManager 18 + AuditLogger 14)
 - Authentification JWT stateless (HS256)
@@ -197,10 +197,27 @@ mcp_server/
 - Gestion clients avec bcrypt password hashing
 - Audit trail immuable append-only
 
+**Phase 4 ✅**
+- 2 modules : TCPTransport, WebSocketTransport
+- 9 tests unitaires (5 TCP + 4 WebSocket)
+- 11 tests d'intégration pour multi-transport
+- Support TCP avec length-prefixed framing
+- Support WebSocket avec aiohttp HTTP+upgrade
+
+**Phase 6 ✅**
+- 4 modules : SubprocessExecutor, ClientIsolationManager, ResourceManager, SandboxStateManager
+- 34 tests unitaires (7+10+10+7)
+- 17 tests d'intégration (isolation, subprocess, quota, state, permissions)
+- Exécution isolée par processus
+- Isolation répertoire par client
+- Quotas CPU/Memory/Disk
+- Persistance d'état par client
+- 3 nouvelles permissions RBAC
+
 **Cumulatif 🎯**
-- **Total : 213+ tests ✓ (73 + 76 + 64+)**
-- **Composants:** 20 modules implémentés
-- **Architecture:** 4 couches (Transport → Protocol → Business Logic → Resources + Security)
+- **Total : 310+ tests ✓ (73 + 76 + 64 + 9 + 11 + 34 + 17)**
+- **Composants:** 32+ modules implémentés
+- **Architecture:** 5 couches (Transport → Protocol → Business Logic → Resources + Security → Isolation)
 
 ## 🔒 Sécurité
 

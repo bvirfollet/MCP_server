@@ -60,6 +60,11 @@ class PermissionType(str, Enum):
     PROCESS_SPAWN = "PROCESS_SPAWN"
     PROCESS_KILL = "PROCESS_KILL"
 
+    # Phase 6: Process Isolation
+    FILE_READ_CROSS_CLIENT = "FILE_READ_CROSS_CLIENT"        # Read other clients' files
+    FILE_WRITE_CROSS_CLIENT = "FILE_WRITE_CROSS_CLIENT"      # Write other clients' files
+    QUOTA_OVERRIDE = "QUOTA_OVERRIDE"                        # Ignore resource quotas
+
 
 @dataclass
 class Permission:
