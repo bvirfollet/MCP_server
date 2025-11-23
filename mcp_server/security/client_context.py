@@ -79,17 +79,24 @@ class ClientContext:
     - Resource quotas and isolation
     """
 
-    def __init__(self, client_info: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        client_info: Optional[Dict[str, Any]] = None,
+        client_id: Optional[str] = None
+    ):
         """
         Initialize client context
 
         Args:
             client_info: Optional client metadata (name, version, etc.)
+            client_id: Optional pre-existing client ID (for authenticated clients)
         """
         self.logger = logging.getLogger("security.client_context")
 
-        # Create metadata
+        # Create metadata with optional client_id
+        metadata_client_id = client_id if client_id else str(uuid.uuid4())
         self.metadata = ClientMetadata(
+            client_id=metadata_client_id,
             client_info=client_info or {}
         )
 

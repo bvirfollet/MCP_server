@@ -35,6 +35,16 @@ VERSION_MINOR = 1
 VERSION_PATCH = 0
 VERSION_SUFFIX = "alpha"
 
-# Export main classes when they're ready
-# from .core.mcp_server import MCPServer
-# from .transport.base_transport import BaseTransport
+# Export main classes
+from .core.mcp_server import MCPServer
+from .transport.base_transport import BaseTransport
+from .security.permission import Permission, PermissionType
+from .tools.tool import Tool
+
+__all__ = [
+    "MCPServer",
+    "BaseTransport",
+    "Permission",
+    "PermissionType",
+    "Tool",
+]

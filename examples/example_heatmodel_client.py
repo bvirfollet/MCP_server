@@ -415,8 +415,11 @@ async def run_heatmodel_client():
     print(f"✓ Access token generated (valid for 1 hour)")
     print(f"  Token preview: {access_token[:30]}...{access_token[-10:]}")
 
-    # Create authenticated context
-    ctx = ClientContext(client_info={"model": "HeatSimulation Builder"})
+    # Create authenticated context with the test client's ID
+    ctx = ClientContext(
+        client_info={"model": "HeatSimulation Builder"},
+        client_id=test_client.client_id  # Link context to authenticated client
+    )
     ctx.authenticated = True
     ctx.user_id = test_client.client_id
     ctx.username = test_client.username
