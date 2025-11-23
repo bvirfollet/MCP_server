@@ -4,6 +4,10 @@
 # Core dependencies
 pydantic>=2.0,<3.0
 
+# Phase 3: Authentication
+PyJWT>=2.8,<3.0          # JWT generation/validation
+bcrypt>=4.1,<5.0        # Password hashing
+
 # Optionnel (uncomment pour Phase 4+)
 # aiohttp>=3.8,<4.0
 # websockets>=11.0,<12.0
