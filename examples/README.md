@@ -1,10 +1,10 @@
-# Exemples de Client MCP - Phase 2
+# Exemples de Client MCP - Phase 1, 2, et 3
 
-Ce répertoire contient des clients MCP d'exemple pour démontrer les capacités du serveur MCP.
+Ce répertoire contient des clients MCP d'exemple pour démontrer les capacités du serveur MCP à travers les 3 phases de développement.
 
 ## 📋 Contenu
 
-### `example_client.py` - Démonstration Phase 2
+### `example_client.py` - Démonstration Phase 1-2 (RBAC & Permissions)
 
 Client de démonstration complet montrant:
 
@@ -33,16 +33,78 @@ Client de démonstration complet montrant:
    - Durée moyenne d'exécution
    - État du sandbox client
 
+### `example_heatmodel_client.py` - Démonstration Phase 1, 2, et 3 (HeatSimulation Integration)
+
+Client réaliste pour la construction de modèles volumétriques 3D de maisons, démontrant l'intégration complète avec le projet [HeatSimulation](https://github.com/bvirfollet/HeatSimulation).
+
+**Phases démontrées:**
+
+1. **Phase 1: Transport Stdio**
+   - Communication JSON-RPC asynchrone avec le serveur MCP
+   - Requêtes et réponses structurées
+
+2. **Phase 2: Outils et Permissions**
+   - 5 outils d'exemple pour la modélisation 3D:
+     - `initialize_model` - Création d'une grille 3D
+     - `add_volume` - Ajout de volumes rectangulaires avec matériaux
+     - `list_materials` - Affichage des matériaux disponibles (10+ types)
+     - `get_model_info` - Statistiques du modèle
+     - `export_to_json` - Export JSON (requiert permission FILE_WRITE)
+   - Système RBAC avec vérification des permissions avant exécution
+
+3. **Phase 3: Authentification JWT et Audit**
+   - Création de client avec authentification bcrypt
+   - Génération de tokens JWT (access + refresh)
+   - Audit trail immutable avec 15+ événements loggés
+   - Persistance JSON (clients.json, tokens.json, audit.json)
+
+**Modèle construit:**
+
+Le client construit une **maison passive réaliste** compatible avec HeatSimulation:
+
+- **Dimensions**: 12m (X) × 10m (Y) × 5m (Z)
+- **Résolution**: Grille 0.2m (60 × 50 × 25 = 75,000 voxels)
+- **Couches** (de bas en haut):
+  - Terre (TERRE) - Couplage thermique sol
+  - Fondation (BETON) - Masse thermique
+  - Isolation sol (POLYSTYRENE) - R-value élevée
+  - Zone intérieure (AIR) - Espace climatisé 11.4m × 9.4m × 2.65m
+  - Murs composites (MUR_COMPOSITE_EXT) - Isolation intégrée
+  - Isolation comble (LAINE_BOIS) - Faible conductivité
+  - Toiture (BETON) - Élément structurel
+
+**Export compatible HeatSimulation:**
+
+```json
+{
+  "metadata": {"version": "1.0", "description": "Modèle volumétrique 3D"},
+  "geometry": {"dimensions": {...}, "grid_size": {...}},
+  "volumes": [...],
+  "materials": {...},
+  "statistics": {...}
+}
+```
+
+Pour la documentation complète, voir [HEATMODEL_CLIENT_GUIDE.md](./HEATMODEL_CLIENT_GUIDE.md).
+
 ## 🚀 Utilisation
 
-### Exécuter la démonstration:
+### Exécuter les démonstrations:
 
+#### Client RBAC & Permissions (Phase 1-2):
 ```bash
-# Depuis la racine du projet
+cd /mnt/share/Sources/MCP_server
 python examples/example_client.py
 ```
 
-### Output de démonstration:
+#### Client HeatSimulation (Phase 1-2-3):
+```bash
+cd /mnt/share/Sources/MCP_server
+mkdir -p data_heatmodel  # Créer le répertoire de sortie
+python examples/example_heatmodel_client.py
+```
+
+### Output de démonstration (example_client.py):
 
 Le client va :
 1. **Créer un serveur** avec 3 outils d'exemple
@@ -153,6 +215,20 @@ Taux de succès: 50.0%
 
 ## 🔗 Références
 
-- Voir [`../mcp_server/tools/tool.py`](../mcp_server/tools/tool.py) pour la classe Tool
-- Voir [`../mcp_server/security/permission.py`](../mcp_server/security/permission.py) pour les permissions
-- Voir [`../mcp_server/resources/execution_manager.py`](../mcp_server/resources/execution_manager.py) pour l'exécution sécurisée
+### Documentation des Clients
+- **[HEATMODEL_CLIENT_GUIDE.md](./HEATMODEL_CLIENT_GUIDE.md)** - Guide complet du client HeatSimulation (Phase 3 integration test)
+
+### Composants MCP (Phase 1-2)
+- [`../mcp_server/tools/tool.py`](../mcp_server/tools/tool.py) - Classe Tool abstraite
+- [`../mcp_server/security/permission.py`](../mcp_server/security/permission.py) - Système RBAC (Permissions)
+- [`../mcp_server/resources/execution_manager.py`](../mcp_server/resources/execution_manager.py) - Exécution sécurisée
+
+### Composants Authentification (Phase 3)
+- [`../mcp_server/security/authentication/jwt_handler.py`](../mcp_server/security/authentication/jwt_handler.py) - JWT generation/validation
+- [`../mcp_server/security/authentication/client_manager.py`](../mcp_server/security/authentication/client_manager.py) - Client credentials avec bcrypt
+- [`../mcp_server/persistence/token_store.py`](../mcp_server/persistence/token_store.py) - Persistance tokens.json
+- [`../mcp_server/persistence/audit_store.py`](../mcp_server/persistence/audit_store.py) - Audit trail immutable
+
+### Architecture Générale
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) - Architecture générale du serveur MCP
+- [`../ARCHITECTURE_PHASE3.md`](../ARCHITECTURE_PHASE3.md) - Architecture Phase 3 (Authentification & Persistance)
