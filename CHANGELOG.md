@@ -4,6 +4,102 @@ Tous les changements importants de ce projet sont documentés dans ce fichier.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/) et ce projet adhère à [Semantic Versioning](https://semver.org/).
 
+## [0.2.0-alpha] - 2025-11-23
+
+### Added (Ajouté)
+
+#### Phase 2 : Système d'Outils et Permissions (Tools & Permissions)
+
+##### Système RBAC (Role-Based Access Control)
+- ✅ **permission.py** (Permission, PermissionType)
+  - 7 types de permissions granulaires (FILE_READ, FILE_WRITE, CODE_EXECUTION, etc.)
+  - Support wildcard patterns pour les chemins fichiers
+  - Support whitelist pour les commandes système
+  - Matching intelligent avec `fnmatch`
+  - 14 tests unitaires ✓
+
+##### Registre d'Outils (Tool Registry)
+- ✅ **tool.py** (Tool, FunctionTool, InputSchema, OutputSchema)
+  - Classe abstraite Tool pour tous les outils
+  - Implémentation FunctionTool pour wrapper async functions
+  - Déclaration de schémas d'entrée/sortie (JSON Schema)
+  - Déclaration de permissions requises
+  - 9 tests unitaires ✓
+
+- ✅ **tool_manager.py** (ToolManager)
+  - Registre centralisé pour tous les outils
+  - Support décorateur `@server.tool()`
+  - Exposition d'info outils pour clients MCP
+  - Framework filtrage par client (Phase 3)
+  - 9 tests unitaires ✓
+
+##### Gestion des Permissions (Permission Management)
+- ✅ **permission_manager.py** (PermissionManager)
+  - Vérification RBAC avant exécution
+  - Grant/revoke de permissions par client
+  - Audit trail des changements de permissions
+  - Permissions par défaut (DEFAULT_PERMISSIONS)
+  - 10 tests unitaires ✓
+
+##### Exécution Sécurisée (Secure Execution)
+- ✅ **execution_manager.py** (ExecutionManager)
+  - Orchestration complète d'exécution d'outils
+  - Validation des paramètres (JSON Schema basique)
+  - Vérification des permissions avant exécution
+  - Gestion des timeouts (30s par défaut)
+  - Audit logging des exécutions
+  - Gestion des erreurs avec sanitization
+  - 13 tests unitaires ✓
+
+- ✅ **sandbox_context.py** (SandboxContext)
+  - Contexte d'exécution isolé par client
+  - Stockage de variables persistantes
+  - Comptage des exécutions
+  - Tracking d'activité (created_at, last_activity, idle_time)
+  - Nettoyage des ressources
+  - 13 tests unitaires ✓
+
+##### Intégration MCPServer
+- ✅ **mcp_server.py** (Phase 2 integration)
+  - Handler `tools/list` - Liste des outils avec métadonnées
+  - Handler `tools/call` - Exécution sécurisée des outils
+  - Décorateur `@server.tool()` pour enregistrement
+  - Gestion des contextes sandbox par client
+  - 8 tests Phase 2 ✓
+
+### Statistics
+
+**Phase 2 Validation Complète:**
+- **Tests Totaux:** 76/76 ✓ PASSED
+- **Composants:** 6 modules principaux
+- **Couches de sécurité:** 3 (Registry → Authorization → Execution)
+- **Isolation:** Per-client sandboxes avec persistance variables
+
+**Architecture de sécurité:**
+```
+┌─────────────────────────────────────────┐
+│  MCP Client (tools/list, tools/call)    │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│  MCPServer + ToolManager + Protocol     │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│  PermissionManager (RBAC)               │
+│  - Grant/revoke permissions             │
+│  - Audit trail                          │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│  ExecutionManager + SandboxContext      │
+│  - Validation                           │
+│  - Permission check                     │
+│  - Timeout enforcement                  │
+│  - Audit logging                        │
+└─────────────────────────────────────────┘
+```
+
 ## [0.1.0-alpha] - 2025-11-23
 
 ### Added (Ajouté)

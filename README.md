@@ -36,6 +36,8 @@ pip install -r requirements-dev.txt
 ```
 
 ### Utilisation Simple
+
+#### Exemple basique (Phase 1)
 ```python
 from mcp_server import MCPServer
 
@@ -52,13 +54,52 @@ server = MCPServer()
         "required": ["name"]
     }
 )
-async def hello_tool(name: str) -> str:
-    return f"Bonjour {name}!"
+async def hello_tool(ctx, params):
+    name = params.get("name", "World")
+    return {"greeting": f"Bonjour {name}!"}
 
 # Démarrer le serveur
 if __name__ == "__main__":
     server.run()
 ```
+
+#### Exemple avec permissions (Phase 2)
+```python
+from mcp_server import MCPServer
+from mcp_server.security.permission import Permission, PermissionType
+
+# Créer le serveur
+server = MCPServer()
+
+# Outil simple (sans permission)
+@server.tool(
+    name="greet",
+    description="Salue quelqu'un",
+    input_schema={"properties": {"name": {"type": "string"}}, "required": ["name"]}
+)
+async def greet(ctx, params):
+    name = params.get("name")
+    return {"message": f"Salut {name}!"}
+
+# Outil avec permission FILE_READ
+@server.tool(
+    name="read_file",
+    description="Lit un fichier",
+    input_schema={"properties": {"path": {"type": "string"}}, "required": ["path"]},
+    permissions=[Permission(PermissionType.FILE_READ, "/app/data/*")]
+)
+async def read_file(ctx, params):
+    path = params.get("path")
+    return {"content": f"Contenu de {path}"}
+
+# Démarrer le serveur
+if __name__ == "__main__":
+    server.run()
+```
+
+### Voir aussi
+- **[Démonstration Phase 2](./examples/README.md)** - Client MCP complet avec permissions
+- Exécutez `python examples/example_client.py` pour voir une démo en action
 
 ## 📚 Documentation
 
@@ -124,13 +165,29 @@ mcp_server/
 
 | Phase | Objectif | Status |
 |-------|----------|--------|
-| **1** | Démarrage serveur, protocole MCP de base | 🔄 En cours |
-| **2** | Enregistrement et exécution de tools | ⏳ À venir |
-| **3** | Système d'authentification complet | ⏳ À venir |
+| **1** | Démarrage serveur, protocole MCP de base, transport Stdio | ✅ Complet (73 tests) |
+| **2** | Enregistrement et exécution de tools, permissions RBAC, sandbox | ✅ Complet (76 tests) |
+| **2.5** | Safe namespace pour code execution (optionnel) | ⏳ À venir |
+| **3** | Système d'authentification complet (JWT, mTLS) | ⏳ À venir |
 | **4** | Transport TCP/HTTP+WebSocket | ⏳ À venir |
 | **5** | Transport DBus | ⏳ À venir |
-| **6** | Sandbox et isolation | ⏳ À venir |
-| **7** | Audit et monitoring | ⏳ À venir |
+| **6** | Isolation par processus (subprocess) | ⏳ À venir |
+| **7** | Audit et monitoring avancé | ⏳ À venir |
+
+### 📊 Statistiques de Validation
+
+**Phase 1 ✅**
+- 6 modules : Transport, Protocol, Client Context, Constants, MCPServer
+- 73 tests unitaires passants
+- Architecte 3-tiers complète
+
+**Phase 2 ✅**
+- 6 modules : Permission, Tool, ToolManager, PermissionManager, ExecutionManager, SandboxContext
+- 76 tests unitaires passants
+- Système RBAC complet avec audit trail
+- Per-client sandbox contexts avec persistance variables
+- Exécution sécurisée avec timeouts et validation
+- **Total : 149 tests ✓ PASSED**
 
 ## 🔒 Sécurité
 
