@@ -168,7 +168,8 @@ mcp_server/
 | **1** | Démarrage serveur, protocole MCP de base, transport Stdio | ✅ Complet (73 tests) |
 | **2** | Enregistrement et exécution de tools, permissions RBAC, sandbox | ✅ Complet (76 tests) |
 | **2.5** | Safe namespace pour code execution (optionnel) | ⏳ À venir |
-| **3** | Système d'authentification complet (JWT, mTLS) | ⏳ À venir |
+| **3** | Authentification JWT + Persistance JSON (tokens, clients, audit) | 🔄 En cours (64+ tests) |
+| **3.1** | mTLS optionnel et rotation de clés | ⏳ À venir |
 | **4** | Transport TCP/HTTP+WebSocket | ⏳ À venir |
 | **5** | Transport DBus | ⏳ À venir |
 | **6** | Isolation par processus (subprocess) | ⏳ À venir |
@@ -179,7 +180,7 @@ mcp_server/
 **Phase 1 ✅**
 - 6 modules : Transport, Protocol, Client Context, Constants, MCPServer
 - 73 tests unitaires passants
-- Architecte 3-tiers complète
+- Architecture 3-tiers complète
 
 **Phase 2 ✅**
 - 6 modules : Permission, Tool, ToolManager, PermissionManager, ExecutionManager, SandboxContext
@@ -187,7 +188,19 @@ mcp_server/
 - Système RBAC complet avec audit trail
 - Per-client sandbox contexts avec persistance variables
 - Exécution sécurisée avec timeouts et validation
-- **Total : 149 tests ✓ PASSED**
+
+**Phase 3 🔄 En cours**
+- 8 modules : JSONStore, TokenManager, JWTHandler, ClientManager, AuditLogger, MCPServer (Phase 3), ClientContext (Phase 3), + test runner
+- 64+ tests unitaires (JSONStore 8 + TokenManager 12 + JWTHandler 12 + ClientManager 18 + AuditLogger 14)
+- Authentification JWT stateless (HS256)
+- Persistance JSON locale (tokens.json, clients.json, audit.json)
+- Gestion clients avec bcrypt password hashing
+- Audit trail immuable append-only
+
+**Cumulatif 🎯**
+- **Total : 213+ tests ✓ (73 + 76 + 64+)**
+- **Composants:** 20 modules implémentés
+- **Architecture:** 4 couches (Transport → Protocol → Business Logic → Resources + Security)
 
 ## 🔒 Sécurité
 

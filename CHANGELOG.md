@@ -4,6 +4,85 @@ Tous les changements importants de ce projet sont documentés dans ce fichier.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/) et ce projet adhère à [Semantic Versioning](https://semver.org/).
 
+## [0.3.0-alpha] - 2025-11-23
+
+### Added (Ajouté)
+
+#### Phase 3 : Authentification et Persistance (JWT Authentication & Data Persistence)
+
+##### JSON-based Persistence (Base Data Store)
+- ✅ **json_store.py** (JSONStore)
+  - Base class pour persistance JSON
+  - Écriture atomique (temp file + rename)
+  - Permissions fichier restrictives (0600)
+  - Support append-only pour audit logs
+  - 8 tests unitaires ✓
+
+##### JWT Authentication (Stateless Auth)
+- ✅ **jwt_handler.py** (JWTHandler)
+  - Génération JWT avec HS256 (HMAC-SHA256)
+  - Access tokens (60 min) + Refresh tokens (7 jours)
+  - Validation signature et expiration
+  - Support revocation via JTI
+  - Claims extraction (sub, username, roles)
+  - 12 tests unitaires ✓
+
+##### Token Management & Persistence
+- ✅ **token_store.py** (TokenManager)
+  - Stockage persistant tokens.json
+  - Hachage SHA256 pour sécurité (pas plaintext)
+  - Token revocation blacklist
+  - Cleanup automatique des tokens expirants
+  - Querying par JTI, client, token type
+  - 12 tests unitaires ✓
+
+##### Client Credentials & Authentication
+- ✅ **client_manager.py** (ClientManager)
+  - Gestion clients avec bcrypt (10 rounds)
+  - Authentification username/password
+  - Metadata clients (email, roles, created_at, last_login)
+  - Enable/disable clients
+  - Role management (add/remove roles)
+  - 18 tests unitaires ✓
+
+##### Audit Trail & Logging
+- ✅ **audit_store.py** (AuditLogger)
+  - Append-only audit.json (immuable)
+  - Event types structurés (auth_success, tool_executed, etc.)
+  - Querying par client_id, event_type, username, date_range
+  - Timestamps UTC
+  - 14 tests unitaires ✓
+
+##### MCPServer Integration (Phase 3)
+- ✅ **mcp_server.py** (Phase 3 integration)
+  - Initialization JWTHandler, TokenManager, ClientManager, AuditLogger
+  - 3 endpoints authentification:
+    - `auth/token` - Authentification username/password → JWT
+    - `auth/refresh` - Refresh token → nouveau access token
+    - `auth/revoke` - Revocation de tokens
+  - Token storage et audit logging
+  - ClientContext enrichissement (user_id, username, roles, auth_time)
+
+- ✅ **client_context.py** (Phase 3 enrichissement)
+  - authenticated: Flag authentification
+  - user_id, username, roles: Données utilisateur JWT
+  - auth_time: Timestamp authentification
+  - token_jti: JWT ID pour revocation
+
+### Statistics Phase 3
+
+**Phase 3 Validation Complète (En cours):**
+- **Tests Cumulatifs:** 64+ tests Phase 3 (JSONStore 8 + TokenManager 12 + JWTHandler 12 + ClientManager 18 + AuditLogger 14)
+- **Composants:** 5 modules persistance + 3 modules auth
+- **Architecture:** Authentification JWT stateless + Persistance JSON locale
+- **Sécurité:** bcrypt, JWT HS256, audit trail immuable
+
+**Cumulatif Phases 1+2+3:**
+- **Phase 1:** 73 tests
+- **Phase 2:** 76 tests
+- **Phase 3:** 64+ tests
+- **Total:** 213+ tests
+
 ## [0.2.0-alpha] - 2025-11-23
 
 ### Added (Ajouté)
