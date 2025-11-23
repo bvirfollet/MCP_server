@@ -1,0 +1,9 @@
+# Serveur MCP - Dépendances de Production
+# Version Python: 3.10+
+
+# Core dependencies
+pydantic>=2.0,<3.0
+
+# Optionnel (uncomment pour Phase 4+)
+# aiohttp>=3.8,<4.0
+# websockets>=11.0,<12.0

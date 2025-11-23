@@ -1,0 +1,28 @@
+# Serveur MCP - Dépendances de Développement
+# Inclut les dépendances de production + développement
+
+# Production dependencies
+-r requirements.txt
+
+# Testing
+pytest>=7.4,<8.0
+pytest-asyncio>=0.21,<1.0
+pytest-cov>=4.1,<5.0
+coverage>=7.2,<8.0
+
+# Code quality
+black>=23.7,<24.0
+flake8>=6.0,<7.0
+isort>=5.12,<6.0
+mypy>=1.4,<2.0
+pylint>=2.17,<3.0
+
+# Type hints
+types-setuptools>=67.0
+
+# Documentation (optionnel)
+# sphinx>=6.0
+# sphinx-rtd-theme>=1.2
+
+# Performance monitoring (optionnel)
+# py-spy>=0.3
