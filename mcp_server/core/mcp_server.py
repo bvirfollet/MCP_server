@@ -3,9 +3,17 @@ MCP Server - Main server orchestrator
 
 Module: core.mcp_server
 Date: 2025-11-23
-Version: 0.1.0-alpha
+Version: 0.2.0-alpha
 
 CHANGELOG:
+[2025-11-23 v0.2.0-alpha] Phase 2 integration
+  - Integrated ToolManager for tool registration
+  - Integrated PermissionManager for authorization
+  - Integrated ExecutionManager for secure execution
+  - Added tools/list and tools/call handlers
+  - Added @server.tool() decorator support
+  - Client sandbox contexts management
+
 [2025-11-23 v0.1.0-alpha] Initial implementation
   - Main MCP server class
   - Transport management (start/stop)
@@ -50,6 +58,10 @@ from ..transport.base_transport import BaseTransport, TransportMessage, Transpor
 from ..transport.stdio_transport import StdioTransport
 from ..protocol.mcp_protocol_handler import MCPProtocolHandler
 from ..security.client_context import ClientContext
+from ..tools.tool_manager import ToolManager
+from ..security.permission_manager import PermissionManager
+from ..resources.execution_manager import ExecutionManager
+from ..resources.sandbox_context import SandboxContext
 
 
 @dataclass
@@ -108,12 +120,26 @@ class MCPServer:
         self._clients: Dict[str, ClientContext] = {}
         self._total_requests = 0
 
+        # Phase 2: Tool & Permission Management
+        self.tool_manager = ToolManager()
+        self.permission_manager = PermissionManager()
+        self.execution_manager = ExecutionManager(self.permission_manager)
+
+        # Sandbox contexts per client
+        self._sandbox_contexts: Dict[str, SandboxContext] = {}
+
         # Server state
         self._is_running = False
         self._startup_time: Optional[datetime] = None
 
         # Capabilities
         self._capabilities = DEFAULT_CAPABILITIES.copy()
+        # Add tools capability
+        self._capabilities["tools"] = {}
+
+        # Register Phase 2 method handlers
+        self.register_method("tools/list", self._handle_tools_list)
+        self.register_method("tools/call", self._handle_tools_call)
 
         self.logger.info(f"Server initialized: {server_name} v{server_version}")
 
@@ -176,6 +202,30 @@ class MCPServer:
         """
         self.protocol_handler.register_method(method, handler)
         self.logger.debug(f"Method registered: {method}")
+
+    def tool(self, name: str, description: str, **kwargs):
+        """
+        Decorator to register a tool
+
+        Usage:
+            @server.tool(
+                name="read_file",
+                description="Read a file",
+                input_schema={"path": {"type": "string"}},
+                permissions=[Permission(PermissionType.FILE_READ, "/app/data/*")]
+            )
+            async def read_file(client, params):
+                return {"content": "..."}
+
+        Args:
+            name: Tool name
+            description: Tool description
+            **kwargs: Additional arguments (input_schema, output_schema, permissions, timeout)
+
+        Returns:
+            decorator: Function decorator
+        """
+        return self.tool_manager.tool(name, description, **kwargs)
 
     async def start(self) -> None:
         """
@@ -329,6 +379,76 @@ class MCPServer:
             await self.transport.send_error(error)
         except Exception as e:
             self.logger.error(f"Could not send error response: {e}")
+
+    async def _handle_tools_list(
+        self,
+        client: ClientContext,
+        params: dict
+    ) -> dict:
+        """
+        Handle tools/list request
+
+        Returns list of available tools with their metadata.
+
+        Args:
+            client: Client context
+            params: Request parameters (unused)
+
+        Returns:
+            dict: {"tools": [...]} with tool information
+        """
+        self.logger.debug(f"Client {client.client_id} requested tools list")
+
+        # Get tools visible to this client
+        tools_info = self.tool_manager.get_info_for_client(client)
+
+        return {"tools": tools_info}
+
+    async def _handle_tools_call(
+        self,
+        client: ClientContext,
+        params: dict
+    ) -> dict:
+        """
+        Handle tools/call request
+
+        Executes a tool with provided parameters.
+
+        Args:
+            client: Client context
+            params: {"name": "tool_name", "arguments": {...}}
+
+        Returns:
+            dict: Tool execution result
+
+        Raises:
+            ValueError: If tool not found or parameters invalid
+        """
+        tool_name = params.get("name")
+        arguments = params.get("arguments", {})
+
+        if not tool_name:
+            raise ValueError("Tool name is required")
+
+        self.logger.info(
+            f"Client {client.client_id} calling tool: {tool_name}"
+        )
+
+        # Get tool
+        tool = self.tool_manager.get(tool_name)
+        if not tool:
+            raise ValueError(f"Tool not found: {tool_name}")
+
+        # Ensure client has permissions initialized
+        if client.client_id not in self.permission_manager._client_permissions:
+            self.permission_manager.initialize_client(client.client_id)
+
+        # Execute tool securely
+        result = await self.execution_manager.execute_tool(
+            tool, client, arguments
+        )
+
+        return result
 
 
 # ============================================================================
