@@ -1,6 +1,6 @@
-# Exemples de Client MCP - Phase 1, 2, et 3
+# Exemples de Client MCP - Phase 1, 2, 3, et 4
 
-Ce répertoire contient des clients MCP d'exemple pour démontrer les capacités du serveur MCP à travers les 3 phases de développement.
+Ce répertoire contient des clients MCP d'exemple pour démontrer les capacités du serveur MCP à travers les 4 phases de développement.
 
 ## 📋 Contenu
 
@@ -87,6 +87,134 @@ Le client construit une **maison passive réaliste** compatible avec HeatSimulat
 
 Pour la documentation complète, voir [HEATMODEL_CLIENT_GUIDE.md](./HEATMODEL_CLIENT_GUIDE.md).
 
+### `example_tcp_client.py` - Démonstration Phase 4 (TCP Transport)
+
+Client simple pour démontrer la connectivité TCP au serveur MCP.
+
+**Caractéristiques:**
+
+1. **Connexion TCP asynchrone**
+   - Établit une connexion socket TCP au serveur
+   - Utilise asyncio pour gestion des requêtes asynchrones
+
+2. **Protocole Length-Prefixed**
+   - Format: 4 bytes (big-endian) pour la longueur + données JSON
+   - Permet streaming fiable de messages JSON-RPC
+
+3. **Démonstration complète**
+   - Requête `initialize` - Handshake avec le serveur
+   - Requête `tools/list` - Listing des outils disponibles
+
+**Usage:**
+
+```bash
+# Terminal 1: Démarrer le serveur MCP avec TCP transport
+python -c "
+import asyncio
+from mcp_server import MCPServer
+server = MCPServer()
+asyncio.run(server.run_with_tcp('localhost', 9000))
+"
+
+# Terminal 2: Lancer le client TCP
+cd /mnt/share/Sources/MCP_server
+python examples/example_tcp_client.py
+```
+
+**Format des messages:**
+
+```
+Client → Server:
+├─ 4 bytes: length (big-endian)
+└─ N bytes: JSON-RPC request
+   {
+     "jsonrpc": "2.0",
+     "method": "initialize",
+     "id": 1,
+     "params": {...}
+   }
+
+Server → Client: (même format)
+```
+
+### `example_websocket_client.py` - Démonstration Phase 4 (WebSocket Transport)
+
+Client pour démontrer la connectivité WebSocket (HTTP+WebSocket) au serveur MCP.
+
+**Caractéristiques:**
+
+1. **WebSocket avec HTTP upgrade**
+   - Endpoint: `ws://localhost:9001/ws`
+   - Compatible navigateur (peut être exécuté depuis console browser)
+   - Utilise aiohttp pour client WebSocket
+
+2. **Communication full-duplex**
+   - Messages texte JSON sans framing (WebSocket gère le framing)
+   - Réception de notifications server-to-client
+
+3. **Démonstration complète**
+   - Requête `initialize` - Handshake avec le serveur
+   - Requête `tools/list` - Listing des outils disponibles
+
+**Usage (Python):**
+
+```bash
+# Terminal 1: Démarrer le serveur MCP avec WebSocket transport
+python -c "
+import asyncio
+from mcp_server import MCPServer
+server = MCPServer()
+asyncio.run(server.run_with_websocket('localhost', 9001))
+"
+
+# Terminal 2: Lancer le client WebSocket
+cd /mnt/share/Sources/MCP_server
+python examples/example_websocket_client.py
+```
+
+**Usage (Browser Console):**
+
+```javascript
+// Ouvrir DevTools (F12) sur une page servie par le serveur MCP
+const ws = new WebSocket('ws://localhost:9001/ws');
+
+ws.onopen = () => {
+    console.log('Connecté au serveur MCP');
+    ws.send(JSON.stringify({
+        jsonrpc: "2.0",
+        method: "initialize",
+        id: 1,
+        params: {
+            protocolVersion: "2024-11",
+            capabilities: {},
+            clientInfo: {name: "browser-client", version: "1.0"}
+        }
+    }));
+};
+
+ws.onmessage = (e) => {
+    console.log('Message reçu:', JSON.parse(e.data));
+};
+
+ws.onerror = (e) => console.error('Erreur:', e);
+ws.onclose = () => console.log('Déconnecté');
+```
+
+**Format des messages:**
+
+```
+Client → Server:
+└─ JSON-RPC request (string)
+   {
+     "jsonrpc": "2.0",
+     "method": "initialize",
+     "id": 1,
+     "params": {...}
+   }
+
+Server → Client: (même format, pas de framing nécessaire)
+```
+
 ## 🚀 Utilisation
 
 ### Exécuter les démonstrations:
@@ -102,6 +230,28 @@ python examples/example_client.py
 cd /mnt/share/Sources/MCP_server
 mkdir -p data_heatmodel  # Créer le répertoire de sortie
 python examples/example_heatmodel_client.py
+```
+
+#### Client TCP (Phase 4):
+```bash
+# Terminal 1: Démarrer le serveur MCP
+cd /mnt/share/Sources/MCP_server
+python -c "import asyncio; from mcp_server import MCPServer; server = MCPServer(); asyncio.run(server.run_with_tcp('localhost', 9000))"
+
+# Terminal 2: Lancer le client TCP
+cd /mnt/share/Sources/MCP_server
+python examples/example_tcp_client.py
+```
+
+#### Client WebSocket (Phase 4):
+```bash
+# Terminal 1: Démarrer le serveur MCP
+cd /mnt/share/Sources/MCP_server
+python -c "import asyncio; from mcp_server import MCPServer; server = MCPServer(); asyncio.run(server.run_with_websocket('localhost', 9001))"
+
+# Terminal 2: Lancer le client WebSocket
+cd /mnt/share/Sources/MCP_server
+python examples/example_websocket_client.py
 ```
 
 ### Output de démonstration (example_client.py):

@@ -665,6 +665,129 @@ class MCPServer:
         except Exception as e:
             raise ValueError(f"Token revocation failed: {e}")
 
+    # ========================================================================
+    # Phase 4: Network Transports (TCP/HTTP+WebSocket)
+    # ========================================================================
+
+    async def run_with_tcp(
+        self,
+        host: str = "0.0.0.0",
+        port: int = 9000
+    ) -> None:
+        """
+        Run server with TCP transport only
+
+        Args:
+            host: Host to bind to (default: 0.0.0.0)
+            port: Port to listen on (default: 9000)
+        """
+        from ..transport.tcp_transport import TCPTransport, TCPConfig
+
+        try:
+            config = TCPConfig(host=host, port=port)
+            tcp_transport = TCPTransport(config)
+
+            # Register message handler
+            await tcp_transport.set_message_handler(self._handle_transport_message)
+
+            self.logger.info(f"Starting TCP transport on {host}:{port}")
+            await tcp_transport.start()
+        except KeyboardInterrupt:
+            self.logger.info("TCP server interrupted")
+        except Exception as e:
+            self.logger.error(f"TCP server error: {e}")
+            raise
+
+    async def run_with_websocket(
+        self,
+        host: str = "0.0.0.0",
+        port: int = 9001
+    ) -> None:
+        """
+        Run server with WebSocket transport only
+
+        Args:
+            host: Host to bind to (default: 0.0.0.0)
+            port: Port to listen on (default: 9001)
+        """
+        from ..transport.websocket_transport import WebSocketTransport, WebSocketConfig
+
+        try:
+            config = WebSocketConfig(host=host, port=port)
+            ws_transport = WebSocketTransport(config)
+
+            # Register message handler
+            await ws_transport.set_message_handler(self._handle_transport_message)
+
+            self.logger.info(f"Starting WebSocket transport on {host}:{port}")
+            await ws_transport.start()
+        except KeyboardInterrupt:
+            self.logger.info("WebSocket server interrupted")
+        except Exception as e:
+            self.logger.error(f"WebSocket server error: {e}")
+            raise
+
+    async def run_multi_transport(
+        self,
+        tcp_host: str = "0.0.0.0",
+        tcp_port: int = 9000,
+        ws_host: str = "0.0.0.0",
+        ws_port: int = 9001,
+        include_stdio: bool = True
+    ) -> None:
+        """
+        Run server with multiple transports simultaneously
+
+        Runs Stdio (local), TCP (network), and WebSocket (browser) transports
+        in parallel, allowing clients to connect via any transport.
+
+        Args:
+            tcp_host: TCP host (default: 0.0.0.0)
+            tcp_port: TCP port (default: 9000)
+            ws_host: WebSocket host (default: 0.0.0.0)
+            ws_port: WebSocket port (default: 9001)
+            include_stdio: Include Stdio transport (default: True)
+        """
+        from ..transport.tcp_transport import TCPTransport, TCPConfig
+        from ..transport.websocket_transport import WebSocketTransport, WebSocketConfig
+
+        try:
+            tasks = []
+
+            # Stdio transport (Phase 1)
+            if include_stdio:
+                await self.start()  # Uses Stdio transport by default
+                self.logger.info("Stdio transport enabled")
+
+            # TCP transport (Phase 4)
+            tcp_config = TCPConfig(host=tcp_host, port=tcp_port)
+            tcp_transport = TCPTransport(tcp_config)
+            await tcp_transport.set_message_handler(self._handle_transport_message)
+            tasks.append(tcp_transport.start())
+            self.logger.info(f"TCP transport enabled on {tcp_host}:{tcp_port}")
+
+            # WebSocket transport (Phase 4)
+            ws_config = WebSocketConfig(host=ws_host, port=ws_port)
+            ws_transport = WebSocketTransport(ws_config)
+            await ws_transport.set_message_handler(self._handle_transport_message)
+            tasks.append(ws_transport.start())
+            self.logger.info(f"WebSocket transport enabled on {ws_host}:{ws_port}")
+
+            self.logger.info(
+                f"Multi-transport server running "
+                f"(TCP: {tcp_host}:{tcp_port}, WebSocket: {ws_host}:{ws_port})"
+            )
+
+            # Run all transports concurrently
+            await asyncio.gather(*tasks)
+
+        except KeyboardInterrupt:
+            self.logger.info("Multi-transport server interrupted")
+            await self.stop()
+        except Exception as e:
+            self.logger.error(f"Multi-transport server error: {e}")
+            raise
+
 
 # ============================================================================
 # Unit Tests

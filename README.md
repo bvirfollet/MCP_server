@@ -168,9 +168,9 @@ mcp_server/
 | **1** | Démarrage serveur, protocole MCP de base, transport Stdio | ✅ Complet (73 tests) |
 | **2** | Enregistrement et exécution de tools, permissions RBAC, sandbox | ✅ Complet (76 tests) |
 | **2.5** | Safe namespace pour code execution (optionnel) | ⏳ À venir |
-| **3** | Authentification JWT + Persistance JSON (tokens, clients, audit) | 🔄 En cours (64+ tests) |
+| **3** | Authentification JWT + Persistance JSON (tokens, clients, audit) | ✅ Complet (64+ tests) |
 | **3.1** | mTLS optionnel et rotation de clés | ⏳ À venir |
-| **4** | Transport TCP/HTTP+WebSocket | ⏳ À venir |
+| **4** | Transport TCP/HTTP+WebSocket (multi-transport parallèle) | ✅ Complet (9 tests) |
 | **5** | Transport DBus | ⏳ À venir |
 | **6** | Isolation par processus (subprocess) | ⏳ À venir |
 | **7** | Audit et monitoring avancé | ⏳ À venir |

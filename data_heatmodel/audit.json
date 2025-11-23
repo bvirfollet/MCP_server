@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "timestamp": "2025-11-23T19:58:31.893292+00:00",
+      "event_type": "auth_success",
+      "client_id": "2a0ea332-10d6-47b5-b405-aa00a8d3a8c6",
+      "username": "architect",
+      "status": "success",
+      "message": "Client architect authenticated",
+      "error": null,
+      "details": {}
+    },
+    {
+      "timestamp": "2025-11-23T19:58:58.343142+00:00",
+      "event_type": "auth_success",
+      "client_id": "2a0ea332-10d6-47b5-b405-aa00a8d3a8c6",
+      "username": "architect",
+      "status": "success",
+      "message": "Client architect authenticated",
+      "error": null,
+      "details": {}
+    }
+  ]
+}

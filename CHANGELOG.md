@@ -4,6 +4,55 @@ Tous les changements importants de ce projet sont documentés dans ce fichier.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/) et ce projet adhère à [Semantic Versioning](https://semver.org/).
 
+## [0.4.0-alpha] - 2025-11-23
+
+### Added (Ajouté)
+
+#### Phase 4 : Transport Réseau (TCP/HTTP+WebSocket)
+
+##### TCP Transport
+- ✅ **tcp_transport.py** (TCPTransport)
+  - Support connexions TCP multiples concurrentes
+  - JSON-RPC sur TCP avec framing length-prefix
+  - Configuration flexible (host, port, timeouts)
+  - 5 tests unitaires ✓
+
+##### WebSocket Transport
+- ✅ **websocket_transport.py** (WebSocketTransport)
+  - Support clients web via WebSocket
+  - HTTP upgrade automatique
+  - Compatible avec browser API standard
+  - 4 tests unitaires ✓
+
+##### MCPServer Phase 4 Integration
+- ✅ **mcp_server.py** (Phase 4 extensions)
+  - `run_with_tcp()` - Lancer serveur TCP seul
+  - `run_with_websocket()` - Lancer serveur WebSocket seul
+  - `run_multi_transport()` - Lancer tous les transports en parallèle
+  - Support simultané Stdio + TCP + WebSocket
+
+##### Example Clients
+- ✅ **example_tcp_client.py** - Client TCP simple montrant connexion et MCP initialize
+- ✅ **example_websocket_client.py** - Client WebSocket montrant connexion browser
+
+##### Dependencies
+- ✅ `aiohttp>=3.8,<4.0` - HTTP server et WebSocket support
+
+### Statistics Phase 4
+
+**Phase 4 Validation Complète:**
+- **Tests Unitaires:** 9 tests TCP + WebSocket (5 + 4)
+- **Transports:** TCP + WebSocket (optionnel Stdio)
+- **Architecture:** Multi-transport parallèle + backward compatible
+- **Backward Compatibility:** ✓ Tous les tests Phase 1-3 passent (28/28)
+
+**Cumulatif Phases 1+2+3+4:**
+- **Phase 1:** 15 integration tests
+- **Phase 2:** 13 integration tests
+- **Phase 3:** 63 unit tests
+- **Phase 4:** 9 unit tests + 2 example clients
+- **Total:** 100+ tests passants ✓
+
 ## [0.3.0-alpha] - 2025-11-23
 
 ### Added (Ajouté)
